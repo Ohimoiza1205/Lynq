@@ -1,19 +1,23 @@
+// Replace your entire src/controllers/import.controller.ts with this
 import { Request, Response } from 'express';
 import { Video } from '../models/Video';
 import { Segment } from '../models/Segment';
 import { YouTubeService } from '../services/youtube.service';
+import { TwelveLabsService } from '../services/twelvelabs.service';
 import { logger } from '../utils/logger';
 
 export class ImportController {
   private youtubeService: YouTubeService;
+  private twelveLabsService: TwelveLabsService;
 
   constructor() {
     this.youtubeService = new YouTubeService();
+    this.twelveLabsService = new TwelveLabsService();
   }
 
   async createImportJob(req: Request, res: Response) {
     try {
-      const { queries, maxResults = 3, tags = [] } = req.body;
+      const { queries, maxResults = 5, tags = [] } = req.body;
       const userId = (req as any).user?.sub || 'anonymous';
 
       logger.info('YouTube import started', { queries, maxResults, userId });
@@ -22,6 +26,7 @@ export class ImportController {
         return res.status(400).json({ error: 'Queries array is required' });
       }
 
+      // Search YouTube immediately
       const allVideos = [];
       for (const query of queries) {
         try {
@@ -38,12 +43,15 @@ export class ImportController {
         return res.status(404).json({ error: 'No videos found' });
       }
 
+      // Import videos immediately
       const importedVideos = [];
       for (const youtubeVideo of allVideos.slice(0, maxResults)) {
         try {
           const video = await this.importVideo(youtubeVideo, userId, tags);
           importedVideos.push(video);
-          this.processVideo(video._id.toString());
+          
+          // Start processing
+          this.processVideo(video._id.toString(), youtubeVideo.id.videoId);
         } catch (error) {
           logger.error('Video import failed', { videoId: youtubeVideo.id.videoId, error });
         }
@@ -121,7 +129,7 @@ export class ImportController {
     return video;
   }
 
-  private async processVideo(videoId: string) {
+  private async processVideo(videoId: string, youtubeId: string) {
     try {
       const video = await Video.findById(videoId);
       if (!video) return;
@@ -129,6 +137,9 @@ export class ImportController {
       video.status = 'indexing';
       await video.save();
 
+      const youtubeUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
+      
+      // Create mock segments for now since Twelve Labs might not be set up
       await this.createMockSegments(videoId);
       
       video.status = 'ready';

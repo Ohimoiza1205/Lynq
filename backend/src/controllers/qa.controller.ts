@@ -16,27 +16,27 @@ export class QAController {
 
   async askQuestion(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { videoId } = req.params;
       const { question, contextLimit = 5 } = req.body;
 
       if (!question || typeof question !== 'string') {
         return res.status(400).json({ error: 'Question is required' });
       }
 
-      const video = await Video.findById(id);
+      const video = await Video.findById(videoId);
       if (!video) {
         return res.status(404).json({ error: 'Video not found' });
       }
 
       const relevantSegments = await this.vectorSearchService.searchSegments(
-        id, 
+        videoId, 
         question, 
         parseInt(contextLimit as string)
       );
 
       if (relevantSegments.length === 0) {
         return res.json({
-          videoId: id,
+          videoId,
           question,
           answer: "I couldn't find relevant information in this video to answer your question.",
           confidence: 0,
@@ -48,10 +48,10 @@ export class QAController {
       const answer = await this.geminiService.answerQuestion(context, question);
       const sources = this.extractTimestamps(relevantSegments);
 
-      logger.info('Q&A completed', { videoId: id, question, sourcesCount: sources.length });
+      logger.info('Q&A completed', { videoId, question, sourcesCount: sources.length });
 
       res.json({
-        videoId: id,
+        videoId,
         question,
         answer,
         confidence: this.calculateConfidence(relevantSegments),
@@ -59,22 +59,22 @@ export class QAController {
         contextSegments: relevantSegments.length
       });
     } catch (error) {
-      logger.error('Q&A error', { videoId: req.params.id, error });
+      logger.error('Q&A error', { videoId: req.params.videoId, error });
       res.status(500).json({ error: 'Failed to process question' });
     }
   }
 
   async getVideoTranscript(req: Request, res: Response) {
     try {
-      const { id } = req.params;
+      const { videoId } = req.params;
       const { format = 'segments', includeTimestamps = true } = req.query;
 
-      const video = await Video.findById(id);
+      const video = await Video.findById(videoId);
       if (!video) {
         return res.status(404).json({ error: 'Video not found' });
       }
 
-      const segments = await Segment.find({ videoId: id }).sort({ startSec: 1 });
+      const segments = await Segment.find({ videoId }).sort({ startSec: 1 });
 
       let transcript;
       if (format === 'full') {
@@ -92,7 +92,7 @@ export class QAController {
       }
 
       res.json({
-        videoId: id,
+        videoId,
         videoTitle: video.title,
         format,
         totalSegments: segments.length,
@@ -100,7 +100,7 @@ export class QAController {
         transcript
       });
     } catch (error) {
-      logger.error('Get transcript error', { videoId: req.params.id, error });
+      logger.error('Get transcript error', { videoId: req.params.videoId, error });
       res.status(500).json({ error: 'Failed to retrieve transcript' });
     }
   }

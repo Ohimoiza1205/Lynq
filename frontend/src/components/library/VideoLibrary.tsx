@@ -344,13 +344,11 @@ const VideoLibrary = () => {
         </div>
       )}
 
-      {/* Upload Modal */}
-      {showUpload && (
-        <UploadModal
+      <UploadModal
+          isOpen={showUpload}
           onClose={() => setShowUpload(false)}
           onUploadComplete={fetchVideos}
         />
-      )}
     </div>
   )
 }

@@ -21,7 +21,7 @@ console.log('Creating Express app...');
 const app = express();
 console.log('Express app created successfully');
 
-const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
+const PORT: number = 4001;
 
 // Add test route BEFORE any middleware
 app.get('/test', (req, res) => {
@@ -114,4 +114,5 @@ const startServer = async () => {
   }
 };
 
-startServer();
+startServer();import { advancedRoutes } from './src/routes/advanced.routes';
+app.use('/api', advancedRoutes);
