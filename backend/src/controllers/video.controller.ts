@@ -58,6 +58,100 @@ export class VideoController {
     }
   }
 
+  async uploadFromUrl(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { url, metadata } = req.body;
+      const userId = req.user?.sub || 'anonymous';
+
+      if (!url || !this.isValidVideoUrl(url)) {
+        return res.status(400).json({ error: 'Valid video URL is required' });
+      }
+
+      const title = metadata.title || this.extractTitleFromUrl(url);
+
+      const video = new Video({
+        ownerId: userId,
+        source: 'url',
+        title: title.trim(),
+        description: metadata.description?.trim() || '',
+        track: metadata.track || 'healthcare',
+        status: 'processing',
+        tags: metadata.tags || [],
+        watchUrl: url
+      });
+
+      await video.save();
+
+      const thumbnailUrl = await this.generateThumbnailFromUrl(url, video._id.toString());
+      
+      // Store thumbnail URL in a separate field
+      const updatedVideo = await Video.findByIdAndUpdate(
+        video._id,
+        { thumbnailUrl },
+        { new: true }
+      );
+
+      this.processVideoFromUrl(video._id.toString(), url);
+
+      logger.info('Video imported from URL', { videoId: video._id, url, userId });
+
+      res.status(201).json({
+        videoId: video._id,
+        status: video.status,
+        title: video.title,
+        thumbnailUrl
+      });
+    } catch (error) {
+      logger.error('URL import error', error);
+      res.status(500).json({ error: 'Failed to import video from URL' });
+    }
+  }
+
+  async getAllVideos(req: Request, res: Response) {
+    try {
+      const { specialty, difficulty, status, search, limit = 50 } = req.query;
+      
+      let query: any = {};
+      
+      if (specialty) query['metadata.specialty'] = specialty;
+      if (difficulty) query['metadata.difficulty'] = difficulty;
+      if (status) query.status = status;
+      if (search) {
+        query.$or = [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { tags: { $in: [new RegExp(search as string, 'i')] } }
+        ];
+      }
+
+      const videos = await Video.find(query)
+        .sort({ createdAt: -1 })
+        .limit(parseInt(limit as string));
+
+      const formattedVideos = videos.map(video => ({
+        id: video._id,
+        title: video.title,
+        description: video.description,
+        duration: video.durationSec || 0,
+        url: video.watchUrl,
+        status: video.status,
+        createdAt: video.createdAt,
+        updatedAt: video.updatedAt,
+        metadata: {
+          procedure: this.extractProcedureFromTitle(video.title),
+          specialty: this.inferSpecialty(video.tags, video.title),
+          difficulty: this.inferDifficulty(video.tags),
+          tags: video.tags
+        }
+      }));
+
+      res.json(formattedVideos);
+    } catch (error) {
+      logger.error('Get all videos error', error);
+      res.status(500).json({ error: 'Failed to retrieve videos' });
+    }
+  }
+
   async getVideo(req: Request, res: Response) {
     try {
       const { id } = req.params;
@@ -200,6 +294,123 @@ export class VideoController {
     }
   }
 
+  private isValidVideoUrl(url: string): boolean {
+    try {
+      const urlObj = new URL(url);
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
+      return videoExtensions.some(ext => urlObj.pathname.toLowerCase().endsWith(ext)) ||
+             urlObj.hostname.includes('youtube.com') ||
+             urlObj.hostname.includes('youtu.be') ||
+             urlObj.hostname.includes('vimeo.com');
+    } catch {
+      return false;
+    }
+  }
+
+  private extractTitleFromUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      const filename = urlObj.pathname.split('/').pop() || 'Imported Video';
+      return filename.replace(/\.[^/.]+$/, "").replace(/[_-]/g, ' ');
+    } catch {
+      return 'Imported Video';
+    }
+  }
+
+  private async generateThumbnailFromUrl(videoUrl: string, videoId: string): Promise<string> {
+    try {
+      if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+        const videoIdMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+        if (videoIdMatch) {
+          return `https://img.youtube.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
+        }
+      }
+
+      const thumbnailPath = `thumbnails/${videoId}_thumb.jpg`;
+      return await this.cloudflareService.generateSignedDownloadUrl(thumbnailPath);
+    } catch (error) {
+      logger.error('Thumbnail generation error', { videoId, error });
+      return this.getDefaultThumbnail();
+    }
+  }
+
+  private getDefaultThumbnail(): string {
+    return '/api/placeholder/video-thumbnail.jpg';
+  }
+
+  private extractProcedureFromTitle(title: string): string {
+    const procedures = ['surgery', 'appendectomy', 'cardiac', 'laparoscopic', 'endoscopy'];
+    const titleLower = title.toLowerCase();
+    const found = procedures.find(proc => titleLower.includes(proc));
+    return found ? found.charAt(0).toUpperCase() + found.slice(1) : 'Medical Procedure';
+  }
+
+  private inferSpecialty(tags: string[], title: string): string {
+    const specialtyMap: Record<string, string> = {
+      cardiac: 'Cardiothoracic Surgery',
+      heart: 'Cardiothoracic Surgery',
+      appendix: 'General Surgery',
+      laparoscopic: 'General Surgery',
+      neuro: 'Neurosurgery',
+      brain: 'Neurosurgery',
+      orthopedic: 'Orthopedic Surgery',
+      bone: 'Orthopedic Surgery'
+    };
+
+    const allText = [...tags, title].join(' ').toLowerCase();
+    for (const [keyword, specialty] of Object.entries(specialtyMap)) {
+      if (allText.includes(keyword)) {
+        return specialty;
+      }
+    }
+    return 'General Surgery';
+  }
+
+  private inferDifficulty(tags: string[]): string {
+    const difficultyKeywords = {
+      advanced: ['complex', 'advanced', 'expert', 'difficult'],
+      intermediate: ['standard', 'intermediate', 'moderate'],
+      beginner: ['basic', 'simple', 'introduction', 'beginner']
+    };
+
+    const tagText = tags.join(' ').toLowerCase();
+    
+    for (const [level, keywords] of Object.entries(difficultyKeywords)) {
+      if (keywords.some(keyword => tagText.includes(keyword))) {
+        return level;
+      }
+    }
+    return 'intermediate';
+  }
+
+  private async processVideoFromUrl(videoId: string, url: string) {
+    try {
+      const video = await Video.findById(videoId);
+      if (!video) return;
+
+      logger.info('Processing video from URL', { videoId, url });
+
+      const task = await this.twelveLabsService.uploadVideo(url, {
+        filename: `${video.title}.mp4`,
+        title: video.title,
+        description: video.description,
+        track: video.track
+      });
+
+      video.tlVideoId = task._id;
+      await video.save();
+
+      logger.info('Video URL uploaded to Twelve Labs', { videoId, taskId: task._id });
+
+      this.pollTaskStatus(videoId, task._id);
+
+    } catch (error) {
+      logger.error('URL video processing failed', { videoId, error });
+      await this.markVideoAsFailed(videoId, 'URL processing failed');
+    }
+  }
+
+  // Continue with existing private methods...
   private async searchSegments(videoId: string, query: string, topK: number) {
     try {
       const video = await Video.findById(videoId);

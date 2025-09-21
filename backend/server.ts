@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { connectDB } from './config/database';
+import { connectDatabase } from './config/database';
 import { testConnections } from './src/utils/test-connections';
 import { errorHandler, notFound } from './src/middleware/error.middleware';
 import { importRoutes } from './src/routes/import.routes';
@@ -15,8 +15,18 @@ import { exportRoutes } from './src/routes/export.routes';
 
 dotenv.config();
 
+// DIAGNOSTIC TEST - Add this right here
+console.log('Creating Express app...');
 const app = express();
-const PORT = process.env.PORT || 5000;
+console.log('Express app created successfully');
+
+const PORT: number = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
+
+// Add test route BEFORE any middleware
+app.get('/test', (req, res) => {
+  console.log('Test route hit!');
+  res.send('Server is working!');
+});
 
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
@@ -62,19 +72,40 @@ app.use('/api/videos', videoRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/videos', qaRoutes);
 app.use('/api/training', trainingRoutes);
-app.use('/api/export', exportRoutes)
+app.use('/api/export', exportRoutes);
 
 app.use('/api', notFound);
 app.use(errorHandler);
 
 const startServer = async () => {
   try {
+    console.log('Starting server initialization...');
+    
     await testConnections();
-    await connectDB();
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+    console.log('Test connections completed');
+    
+    await connectDatabase();
+    console.log('Database connection completed');
+    
+    console.log(`Attempting to bind to IPv4 localhost:${PORT}...`);
+    
+    const server = app.listen(PORT, '127.0.0.1', () => {
+      console.log(`Server successfully running on http://127.0.0.1:${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV}`);
+      console.log(`Health check: http://127.0.0.1:${PORT}/api/health`);
+      console.log(`Test endpoint: http://127.0.0.1:${PORT}/test`);
     });
+    
+    server.on('error', (error: any) => {
+      console.error('Server error event:', error);
+      process.exit(1);
+    });
+    
+    server.on('listening', () => {
+      const addr = server.address();
+      console.log('Server listening on:', addr);
+    });
+    
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
