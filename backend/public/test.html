@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lynq Backend Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+        
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .test-section h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #34495e;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e1e8ed;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+        
+        .result {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .status.success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .status.error {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lynq Backend API Tester</h1>
+        
+        <div class="grid">
+            <!-- Health Check -->
+            <div class="test-section">
+                <h2>Health Check</h2>
+                <button onclick="testHealth()">Test Health Endpoint</button>
+                <button onclick="testAPIHealth()">Test API Health</button>
+                <div id="healthResult" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- Video Creation -->
+            <div class="test-section">
+                <h2>Create Video (No Auth)</h2>
+                <div class="form-group">
+                    <label>Title:</label>
+                    <input type="text" id="videoTitle" value="Test Medical Video" />
+                </div>
+                <div class="form-group">
+                    <label>Description:</label>
+                    <textarea id="videoDescription" rows="3">Testing video creation from frontend</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Track:</label>
+                    <select id="videoTrack">
+                        <option value="healthcare">Healthcare</option>
+                    </select>
+                </div>
+                <button onclick="createVideo()">Create Video</button>
+                <div id="videoResult" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- Video Retrieval -->
+            <div class="test-section">
+                <h2>Get Video</h2>
+                <div class="form-group">
+                    <label>Video ID:</label>
+                    <input type="text" id="getVideoId" placeholder="Enter video ID from creation" />
+                </div>
+                <button onclick="getVideo()">Get Video Details</button>
+                <div id="getVideoResult" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- Search -->
+            <div class="test-section">
+                <h2>Search Videos</h2>
+                <div class="form-group">
+                    <label>Search Query:</label>
+                    <input type="text" id="searchQuery" value="medical" />
+                </div>
+                <button onclick="searchVideos()">Search Videos</button>
+                <div id="searchResult" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- YouTube Import -->
+            <div class="test-section">
+                <h2>YouTube Import</h2>
+                <div class="form-group">
+                    <label>YouTube URL:</label>
+                    <input type="text" id="youtubeUrl" value="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
+                </div>
+                <div class="form-group">
+                    <label>Track:</label>
+                    <select id="importTrack">
+                        <option value="healthcare">Healthcare</option>
+                    </select>
+                </div>
+                <button onclick="importYouTube()">Import YouTube Video</button>
+                <div id="importResult" class="result" style="display:none;"></div>
+            </div>
+            
+            <!-- Mock Auth Test -->
+            <div class="test-section">
+                <h2>Mock Auth Video Creation</h2>
+                <div class="form-group">
+                    <label>Title:</label>
+                    <input type="text" id="authVideoTitle" value="Authenticated Test Video" />
+                </div>
+                <div class="form-group">
+                    <label>Description:</label>
+                    <textarea id="authVideoDescription" rows="3">Testing with mocked authentication</textarea>
+                </div>
+                <button onclick="createAuthVideo()">Create with Mock Auth</button>
+                <div id="authVideoResult" class="result" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.textContent = JSON.stringify(data, null, 2);
+            
+            const header = element.previousElementSibling;
+            if (header && header.tagName === 'BUTTON') {
+                const existingStatus = header.querySelector('.status');
+                if (existingStatus) existingStatus.remove();
+                
+                const status = document.createElement('span');
+                status.className = `status ${isError ? 'error' : 'success'}`;
+                status.textContent = isError ? 'ERROR' : 'SUCCESS';
+                header.appendChild(status);
+            }
+        }
+        
+        async function makeRequest(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                const data = await response.json();
+                return { success: response.ok, data, status: response.status };
+            } catch (error) {
+                return { success: false, data: { error: error.message }, status: 0 };
+            }
+        }
+        
+        async function testHealth() {
+            const result = await makeRequest(`${API_BASE}/health`);
+            showResult('healthResult', result.data, !result.success);
+        }
+        
+        async function testAPIHealth() {
+            const result = await makeRequest(`${API_BASE}/api/health`);
+            showResult('healthResult', result.data, !result.success);
+        }
+        
+        async function createVideo() {
+            const data = {
+                title: document.getElementById('videoTitle').value,
+                description: document.getElementById('videoDescription').value,
+                track: document.getElementById('videoTrack').value,
+                source: 'upload'
+            };
+            
+            const result = await makeRequest(`${API_BASE}/api/test/video`, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            
+            showResult('videoResult', result.data, !result.success);
+            
+            // Auto-fill video ID for retrieval test
+            if (result.success && result.data.id) {
+                document.getElementById('getVideoId').value = result.data.id;
+            }
+        }
+        
+        async function getVideo() {
+            const videoId = document.getElementById('getVideoId').value;
+            if (!videoId) {
+                showResult('getVideoResult', { error: 'Please enter a video ID' }, true);
+                return;
+            }
+            
+            const result = await makeRequest(`${API_BASE}/api/test/video/${videoId}`);
+            showResult('getVideoResult', result.data, !result.success);
+        }
+        
+        async function searchVideos() {
+            const query = document.getElementById('searchQuery').value;
+            const result = await makeRequest(`${API_BASE}/api/test/search/videos?query=${encodeURIComponent(query)}`);
+            showResult('searchResult', result.data, !result.success);
+        }
+        
+        async function importYouTube() {
+            const data = {
+                url: document.getElementById('youtubeUrl').value,
+                track: document.getElementById('importTrack').value
+            };
+            
+            const result = await makeRequest(`${API_BASE}/api/test/import/youtube`, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            
+            showResult('importResult', result.data, !result.success);
+        }
+        
+        async function createAuthVideo() {
+            const data = {
+                title: document.getElementById('authVideoTitle').value,
+                description: document.getElementById('authVideoDescription').value,
+                track: 'healthcare',
+                source: 'upload'
+            };
+            
+            const result = await makeRequest(`${API_BASE}/api/test/mock-auth-video`, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            
+            showResult('authVideoResult', result.data, !result.success);
+        }
+    </script>
+</body>
+</html>
