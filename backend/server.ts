@@ -12,6 +12,7 @@ import { searchRoutes } from './src/routes/search.routes';
 import { qaRoutes } from './src/routes/qa.routes';
 import { trainingRoutes } from './src/routes/training.routes';
 import { exportRoutes } from './src/routes/export.routes';
+import { testRoutes } from './src/routes/test.routes';
 
 dotenv.config();
 
@@ -73,6 +74,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/videos', qaRoutes);
 app.use('/api/training', trainingRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/test', testRoutes);
 
 app.use('/api', notFound);
 app.use(errorHandler);
