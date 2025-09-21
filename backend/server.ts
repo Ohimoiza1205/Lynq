@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { connectDB } from './config/database';
-import { testConnections } from './src/utils/test-connections';
+import { testConnections, testDatabase } from './src/utils/test-connections';
 import { errorHandler, notFound } from './src/middleware/error.middleware';
 import { importRoutes } from './src/routes/import.routes';
 import { videoRoutes } from './src/routes/video.routes';
@@ -12,6 +12,8 @@ import { searchRoutes } from './src/routes/search.routes';
 import { qaRoutes } from './src/routes/qa.routes';
 import { trainingRoutes } from './src/routes/training.routes';
 import { exportRoutes } from './src/routes/export.routes';
+import { testRoutes } from './src/routes/test.routes';
+
 
 dotenv.config();
 
@@ -62,23 +64,22 @@ app.use('/api/videos', videoRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/videos', qaRoutes);
 app.use('/api/training', trainingRoutes);
-app.use('/api/export', exportRoutes)
+app.use('/api/export', exportRoutes);
+app.use('/api/test', testRoutes)
 
 app.use('/api', notFound);
 app.use(errorHandler);
 
 const startServer = async () => {
-  try {
-    await testConnections();
-    await connectDB();
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV}`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
+  await testConnections();
+  await connectDB();
+  await testDatabase();
+  console.log('MongoDB connected');
+  
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+  });
 };
 
 startServer();
